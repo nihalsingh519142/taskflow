@@ -1,15 +1,26 @@
-const Database = require('better-sqlite3');
 const path = require('path');
+const { open } = require('sqlite');
+const sqlite3 = require('sqlite3');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'taskflow.db');
-const db = new Database(DB_PATH);
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+let db;
 
-function initializeDatabase() {
-  db.exec(`
+async function getDb() {
+  if (!db) {
+    db = await open({
+      filename: DB_PATH,
+      driver: sqlite3.Database
+    });
+    await db.exec('PRAGMA foreign_keys = ON');
+    await db.exec('PRAGMA journal_mode = WAL');
+  }
+  return db;
+}
+
+async function initializeDatabase() {
+  const db = await getDb();
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -68,8 +79,7 @@ function initializeDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
-
-  console.log('✅ Database initialized');
+  console.log('✅ Database initialized at', DB_PATH);
 }
 
-module.exports = { db, initializeDatabase };
+module.exports = { getDb, initializeDatabase };
